@@ -110,6 +110,9 @@ pub fn execute(
         ExecuteMsg::AcceptOffer { offer_id } => accept_offer(deps, info, _env, offer_id),
         ExecuteMsg::ToggleLocation { enabled } => toggle_location(deps, info, _env, enabled),
         ExecuteMsg::DeleteRequest { offer_id } => delete_request(deps, info, _env, offer_id),
+        ExecuteMsg::MarkRequestAsCompleted { request_id } => {
+            mark_request_as_completed(deps, info, _env, request_id)
+        }
     }
 }
 

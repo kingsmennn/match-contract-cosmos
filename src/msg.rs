@@ -52,6 +52,9 @@ pub enum ExecuteMsg {
     DeleteRequest {
         offer_id: u64,
     },
+    MarkRequestAsCompleted {
+        request_id: u64,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
