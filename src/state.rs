@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::Addr;
-use cw_storage_plus::Map;
+use cw_storage_plus::{Item, Map};
 
 // Enums
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -83,3 +83,7 @@ pub const USERS: Map<&[u8], User> = Map::new("users");
 pub const REQUESTS: Map<u64, Request> = Map::new("requests");
 pub const STORES: Map<u64, Store> = Map::new("stores");
 pub const OFFERS: Map<u64, Offer> = Map::new("offers");
+pub const REQUEST_COUNT: Item<u64> = Item::new("request_count");
+pub const OFFER_COUNT: Item<u64> = Item::new("offer_count");
+pub const USER_COUNT: Item<u64> = Item::new("user_count");
+pub const STORE_COUNT: Item<u64> = Item::new("store_count");

@@ -4,10 +4,10 @@ use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
 use cw2::set_contract_version;
 
 use crate::error::MarketplaceError;
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
-    AccountType, Location, Offer, Request, RequestLifecycle, Store, User, OFFERS, REQUESTS, STORES,
-    USERS,
+    AccountType, Location, Offer, Request, RequestLifecycle, Store, User, OFFERS, OFFER_COUNT,
+    REQUESTS, REQUEST_COUNT, STORES, STORE_COUNT, USERS, USER_COUNT,
 };
 
 // version info for migration info
@@ -109,7 +109,6 @@ pub fn execute(
     }
 }
 
-// Create User Function
 pub fn create_user(
     deps: DepsMut,
     info: MessageInfo,
@@ -120,8 +119,9 @@ pub fn create_user(
     longitude: i128,
     account_type: AccountType,
 ) -> StdResult<Response> {
+    let user_count = USER_COUNT.load(deps.storage)?;
     let user = User {
-        id: 1, // Increment logic
+        id: user_count,
         username,
         phone,
         location: Location {
@@ -135,6 +135,8 @@ pub fn create_user(
     };
 
     USERS.save(deps.storage, info.sender.as_bytes(), &user)?;
+    USER_COUNT.save(deps.storage, &(user_count + 1))?;
+
     Ok(Response::new().add_attribute("method", "create_user"))
 }
 
@@ -173,8 +175,14 @@ pub fn create_store(
     latitude: i128,
     longitude: i128,
 ) -> StdResult<Response> {
+    let user = USERS.load(deps.storage, info.sender.as_bytes())?;
+    let store_count = STORE_COUNT.load(deps.storage)?;
+
+    if user.account_type != AccountType::Seller {
+        // return Err(MarketplaceError::OnlySellersAllowed.into());
+    }
     let store = Store {
-        id: 1, // Logic for unique ID
+        id: store_count, // Logic for unique ID
         name,
         description,
         phone,
@@ -185,6 +193,7 @@ pub fn create_store(
     };
 
     STORES.save(deps.storage, store.id, &store)?;
+    STORE_COUNT.save(deps.storage, &(store_count + 1))?;
 
     Ok(Response::new().add_attribute("method", "create_store"))
 }
@@ -198,10 +207,12 @@ pub fn create_request(
     latitude: i128,
     longitude: i128,
 ) -> StdResult<Response> {
+    let request_count = REQUEST_COUNT.load(deps.storage)?;
+    let user = USERS.load(deps.storage, info.sender.as_bytes())?;
     let request = Request {
-        id: 1, // Logic for unique ID
+        id: request_count,
         name,
-        buyer_id: 1, // Assume buyer_id is fetched from user profile
+        buyer_id: user.id,
         seller_price_quote: 0,
         seller_ids: vec![],
         offer_ids: vec![],
@@ -217,8 +228,8 @@ pub fn create_request(
         updated_at: _env.block.time.seconds(),
     };
 
-    // Save request in the REQUESTS map.
     REQUESTS.save(deps.storage, request.id, &request)?;
+    REQUEST_COUNT.save(deps.storage, &(request_count + 1))?;
 
     Ok(Response::new().add_attribute("method", "create_request"))
 }
@@ -231,20 +242,22 @@ pub fn create_offer(
     request_id: u64,
     store_name: String,
 ) -> StdResult<Response> {
+    let offer_count = OFFER_COUNT.load(deps.storage)?;
+    let user = USERS.load(deps.storage, info.sender.as_bytes())?;
     let offer = Offer {
-        id: 1, // Logic for unique ID
+        id: offer_count,
         price,
         images,
         request_id,
         store_name,
-        seller_id: 1, // Assume seller_id is fetched from user profile
+        seller_id: user.id,
         is_accepted: false,
         created_at: _env.block.time.seconds(),
         updated_at: _env.block.time.seconds(),
     };
 
-    // Save the offer in the OFFERS map
     OFFERS.save(deps.storage, offer.id, &offer)?;
+    OFFER_COUNT.save(deps.storage, &(offer_count + 1))?;
 
     Ok(Response::new().add_attribute("method", "create_offer"))
 }
@@ -269,19 +282,6 @@ pub fn accept_offer(
     Ok(Response::new().add_attribute("method", "accept_offer"))
 }
 
-pub fn toggle_location(
-    deps: DepsMut,
-    info: MessageInfo,
-    _env: Env,
-    enabled: bool,
-) -> StdResult<Response> {
-    let mut user = USERS.load(deps.storage, info.sender.as_bytes())?;
-    user.location_enabled = enabled;
-
-    USERS.save(deps.storage, info.sender.as_bytes(), &user)?;
-
-    Ok(Response::new().add_attribute("method", "toggle_location"))
-}
 pub fn remove_offer(
     deps: DepsMut,
     info: MessageInfo,
@@ -297,6 +297,20 @@ pub fn remove_offer(
     OFFERS.remove(deps.storage, offer_id);
 
     Ok(Response::new().add_attribute("method", "remove_offer"))
+}
+
+pub fn toggle_location(
+    deps: DepsMut,
+    info: MessageInfo,
+    _env: Env,
+    enabled: bool,
+) -> StdResult<Response> {
+    let mut user = USERS.load(deps.storage, info.sender.as_bytes())?;
+    user.location_enabled = enabled;
+
+    USERS.save(deps.storage, info.sender.as_bytes(), &user)?;
+
+    Ok(Response::new().add_attribute("method", "toggle_location"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -382,73 +396,73 @@ pub fn query_all_offers(deps: Deps) -> StdResult<Vec<Offer>> {
     Ok(offers)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary};
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
+//     use cosmwasm_std::{coins, from_binary};
 
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+//     #[test]
+//     fn proper_initialization() {
+//         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(1000, "earth"));
+//         let msg = InstantiateMsg { count: 17 };
+//         let info = mock_info("creator", &coins(1000, "earth"));
 
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
+//         // we can just call .unwrap() to assert this was a success
+//         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+//         assert_eq!(0, res.messages.len());
 
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
-    }
+//         // it worked, let's query the state
+//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+//         let value: CountResponse = from_binary(&res).unwrap();
+//         assert_eq!(17, value.count);
+//     }
 
-    #[test]
-    fn increment() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+//     #[test]
+//     fn increment() {
+//         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+//         let msg = InstantiateMsg { count: 17 };
+//         let info = mock_info("creator", &coins(2, "token"));
+//         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // beneficiary can release it
-        let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Increment {};
-        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+//         // beneficiary can release it
+//         let info = mock_info("anyone", &coins(2, "token"));
+//         let msg = ExecuteMsg::Increment {};
+//         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // should increase counter by 1
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
-    }
+//         // should increase counter by 1
+//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+//         let value: CountResponse = from_binary(&res).unwrap();
+//         assert_eq!(18, value.count);
+//     }
 
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+//     #[test]
+//     fn reset() {
+//         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+//         let msg = InstantiateMsg { count: 17 };
+//         let info = mock_info("creator", &coins(2, "token"));
+//         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // beneficiary can release it
-        let unauth_info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-        match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
+//         // beneficiary can release it
+//         let unauth_info = mock_info("anyone", &coins(2, "token"));
+//         let msg = ExecuteMsg::Reset { count: 5 };
+//         let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
+//         match res {
+//             Err(ContractError::Unauthorized {}) => {}
+//             _ => panic!("Must return unauthorized error"),
+//         }
 
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
+//         // only the original creator can reset the counter
+//         let auth_info = mock_info("creator", &coins(2, "token"));
+//         let msg = ExecuteMsg::Reset { count: 5 };
+//         let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
 
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
-    }
-}
+//         // should now be 5
+//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+//         let value: CountResponse = from_binary(&res).unwrap();
+//         assert_eq!(5, value.count);
+//     }
+// }
