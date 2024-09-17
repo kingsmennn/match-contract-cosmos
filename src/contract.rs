@@ -1,6 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+};
 use cw2::set_contract_version;
 
 use crate::error::MarketplaceError;
@@ -172,6 +174,7 @@ pub fn update_user(
 
     Ok(Response::new().add_attribute("method", "update_user"))
 }
+
 pub fn create_store(
     deps: DepsMut,
     info: MessageInfo,
@@ -186,7 +189,9 @@ pub fn create_store(
     let store_count = STORE_COUNT.load(deps.storage)?;
 
     if user.account_type != AccountType::Seller {
-        // return Err(MarketplaceError::OnlySellersAllowed.into());
+        return Err(StdError::generic_err(
+            MarketplaceError::OnlySellersAllowed.to_string(),
+        ));
     }
     let store = Store {
         id: store_count, // Logic for unique ID
@@ -230,7 +235,9 @@ pub fn create_request(
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
     if user.account_type != AccountType::Buyer {
-        // return Err(MarketplaceError::OnlyBuyersAllowed.into());
+        return Err(StdError::generic_err(
+            MarketplaceError::OnlyBuyersAllowed.to_string(),
+        ));
     }
     let request = Request {
         id: request_count,
@@ -269,7 +276,9 @@ pub fn create_offer(
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
     if user.account_type != AccountType::Seller {
-        // return Err(MarketplaceError::OnlySellersAllowed.into());
+        return Err(StdError::generic_err(
+            MarketplaceError::OnlySellersAllowed.to_string(),
+        ));
     }
 
     let mut request = REQUESTS.load(deps.storage, request_id)?;
@@ -311,19 +320,23 @@ pub fn accept_offer(
     let mut request = REQUESTS.load(deps.storage, offer.request_id)?;
 
     if buyer.account_type != AccountType::Buyer {
-        // return Err(MarketplaceError::UnauthorizedBuyer);
+        return Err(StdError::generic_err(
+            MarketplaceError::OnlyBuyersAllowed.to_string(),
+        ));
     }
 
     if offer.is_accepted {
-        // return Err(MarketplaceError::OfferAlreadyAccepted);
+        return Err(StdError::generic_err(
+            MarketplaceError::OfferAlreadyAccepted.to_string(),
+        ));
     }
-
-    // Update the associated request lifecycle
 
     if _env.block.time.seconds() > request.updated_at + TIME_TO_LOCK
         && request.lifecycle == RequestLifecycle::AcceptedByBuyer
     {
-        // return Err(MarketplaceError::RequestLocked);
+        return Err(StdError::generic_err(
+            MarketplaceError::RequestLocked.to_string(),
+        ));
     }
 
     for offer_id in request.offer_ids.iter() {
@@ -354,11 +367,15 @@ pub fn delete_request(
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
     if user.id != request.buyer_id {
-        // return Err(MarketplaceError::UnauthorizedBuyer);
+        return Err(StdError::generic_err(
+            MarketplaceError::UnauthorizedBuyer.to_string(),
+        ));
     }
 
     if request.lifecycle != RequestLifecycle::Pending {
-        // return Err(MarketplaceError::RequestLocked);
+        return Err(StdError::generic_err(
+            MarketplaceError::RequestLocked.to_string(),
+        ));
     }
 
     REQUESTS.remove(deps.storage, request_id);
@@ -390,19 +407,27 @@ pub fn mark_request_as_completed(
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
     if user.id != request.buyer_id {
-        // return Err(MarketplaceError::UnauthorizedBuyer);
+        return Err(StdError::generic_err(
+            MarketplaceError::UnauthorizedBuyer.to_string(),
+        ));
     }
 
     if request.lifecycle != RequestLifecycle::AcceptedByBuyer {
-        // return Err(MarketplaceError::RequestNotAccepted);
+        return Err(StdError::generic_err(
+            MarketplaceError::RequestNotAccepted.to_string(),
+        ));
     }
 
     if request.updated_at.checked_add(TIME_TO_LOCK).unwrap() > _env.block.time.seconds() {
-        // return Err(MarketplaceError::RequestNotLocked);
+        return Err(StdError::generic_err(
+            MarketplaceError::RequestNotLocked.to_string(),
+        ));
     }
 
     if user.account_type != AccountType::Buyer {
-        // return Err(MarketplaceError::OnlyBuyersAllowed);
+        return Err(StdError::generic_err(
+            MarketplaceError::OnlyBuyersAllowed.to_string(),
+        ));
     }
 
     request.lifecycle = RequestLifecycle::Completed;
