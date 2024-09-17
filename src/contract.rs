@@ -197,17 +197,17 @@ pub fn create_store(
     };
 
     STORES.save(deps.storage, store.id, &store)?;
-    USER_STORE_IDS.update(
-        deps.storage,
-        info.sender.as_bytes(),
-        |existing| match existing {
-            Some(mut stores) => {
-                stores.push(store.id);
-                Ok(stores)
-            }
-            None => Ok(vec![store.id]),
-        },
-    )?;
+    // USER_STORE_IDS.update(
+    //     deps.storage,
+    //     info.sender.as_bytes(),
+    //     |existing| match existing {
+    //         Some(mut stores) => {
+    //             stores.push(store.id);
+    //             Ok(stores)
+    //         }
+    //         None => Ok(vec![store.id]),
+    //     },
+    // )?;
 
     STORE_COUNT.save(deps.storage, &(store_count + 1))?;
 
@@ -466,18 +466,12 @@ pub fn query_offer(deps: Deps, offer_id: u64) -> StdResult<Offer> {
 }
 
 pub fn query_offers_for_request(deps: Deps, request_id: u64) -> StdResult<Vec<Offer>> {
-    let offers: Vec<Offer> = OFFERS
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .map(|item| {
-            let (_, offer) = item?;
-            if offer.request_id == request_id {
-                Ok(offer)
-            } else {
-                Err(StdError::generic_err("Offer not related to this request"))
-            }
-        })
+    let request = REQUESTS.load(deps.storage, request_id)?;
+    let offers: Vec<Offer> = request
+        .offer_ids
+        .iter()
+        .map(|offer_id| OFFERS.load(deps.storage, *offer_id))
         .collect::<StdResult<Vec<Offer>>>()?;
-
     Ok(offers)
 }
 
