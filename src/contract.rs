@@ -377,6 +377,39 @@ pub fn toggle_location(
     Ok(Response::new().add_attribute("method", "toggle_location"))
 }
 
+pub fn mark_request_as_completed(
+    deps: DepsMut,
+    info: MessageInfo,
+    _env: Env,
+    request_id: u64,
+) -> StdResult<Response> {
+    let mut request = REQUESTS.load(deps.storage, request_id)?;
+    let user = USERS.load(deps.storage, info.sender.as_bytes())?;
+
+    if user.id != request.buyer_id {
+        // return Err(MarketplaceError::UnauthorizedBuyer);
+    }
+
+    if request.lifecycle != RequestLifecycle::AcceptedByBuyer {
+        // return Err(MarketplaceError::RequestNotAccepted);
+    }
+
+    if request.updated_at.checked_add(TIME_TO_LOCK).unwrap() > _env.block.time.seconds() {
+        // return Err(MarketplaceError::RequestNotLocked);
+    }
+
+    if user.account_type != AccountType::Buyer {
+        // return Err(MarketplaceError::OnlyBuyersAllowed);
+    }
+
+    request.lifecycle = RequestLifecycle::Completed;
+    request.updated_at = _env.block.time.seconds();
+
+    REQUESTS.save(deps.storage, request_id, &request)?;
+
+    Ok(Response::new().add_attribute("method", "mark_request_as_completed"))
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
