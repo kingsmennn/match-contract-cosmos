@@ -3,6 +3,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum MarketplaceError {
+    #[error("{0}")]
+    Std(#[from] StdError),
     #[error("User already exists.")]
     UserAlreadyExists,
     #[error("Invalid account type.")]

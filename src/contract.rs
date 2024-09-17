@@ -6,7 +6,8 @@ use cw2::set_contract_version;
 use crate::error::MarketplaceError;
 use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
-    AccountType, Location, Offer, Request, RequestLifecycle, Store, User, OFFERS, REQUESTS, USERS,
+    AccountType, Location, Offer, Request, RequestLifecycle, Store, User, OFFERS, REQUESTS, STORES,
+    USERS,
 };
 
 // version info for migration info
@@ -41,6 +42,7 @@ pub fn execute(
         } => create_user(
             deps,
             info,
+            _env,
             username,
             phone,
             latitude,
@@ -56,6 +58,7 @@ pub fn execute(
         } => update_user(
             deps,
             info,
+            _env,
             username,
             phone,
             latitude,
@@ -68,23 +71,41 @@ pub fn execute(
             phone,
             latitude,
             longitude,
-        } => create_store(deps, info, name, description, phone, latitude, longitude),
+        } => create_store(
+            deps,
+            info,
+            _env,
+            name,
+            description,
+            phone,
+            latitude,
+            longitude,
+        ),
         ExecuteMsg::CreateRequest {
             name,
             description,
             images,
             latitude,
             longitude,
-        } => create_request(deps, info, name, description, images, latitude, longitude),
+        } => create_request(
+            deps,
+            info,
+            _env,
+            name,
+            description,
+            images,
+            latitude,
+            longitude,
+        ),
         ExecuteMsg::CreateOffer {
             price,
             images,
             request_id,
             store_name,
-        } => create_offer(deps, info, price, images, request_id, store_name),
-        ExecuteMsg::AcceptOffer { offer_id } => accept_offer(deps, info, offer_id),
-        ExecuteMsg::ToggleLocation { enabled } => toggle_location(deps, info, enabled),
-        ExecuteMsg::RemoveOffer { offer_id } => remove_offer(deps, info, offer_id),
+        } => create_offer(deps, info, _env, price, images, request_id, store_name),
+        ExecuteMsg::AcceptOffer { offer_id } => accept_offer(deps, info, _env, offer_id),
+        ExecuteMsg::ToggleLocation { enabled } => toggle_location(deps, info, _env, enabled),
+        ExecuteMsg::RemoveOffer { offer_id } => remove_offer(deps, info, _env, offer_id),
     }
 }
 
@@ -92,6 +113,7 @@ pub fn execute(
 pub fn create_user(
     deps: DepsMut,
     info: MessageInfo,
+    _env: Env,
     username: String,
     phone: String,
     latitude: i128,
@@ -106,8 +128,8 @@ pub fn create_user(
             latitude,
             longitude,
         },
-        created_at: deps.api.block_time().seconds(),
-        updated_at: deps.api.block_time().seconds(),
+        created_at: _env.block.time.seconds(),
+        updated_at: _env.block.time.seconds(),
         account_type,
         location_enabled: true,
     };
@@ -119,6 +141,7 @@ pub fn create_user(
 pub fn update_user(
     deps: DepsMut,
     info: MessageInfo,
+    _env: Env,
     username: String,
     phone: String,
     latitude: i128,
@@ -134,7 +157,7 @@ pub fn update_user(
         longitude,
     };
     user.account_type = account_type;
-    user.updated_at = deps.api.block_time().seconds();
+    user.updated_at = _env.block.time.seconds();
 
     USERS.save(deps.storage, info.sender.as_bytes(), &user)?;
 
@@ -143,6 +166,7 @@ pub fn update_user(
 pub fn create_store(
     deps: DepsMut,
     info: MessageInfo,
+    _env: Env,
     name: String,
     description: String,
     phone: String,
@@ -160,13 +184,14 @@ pub fn create_store(
         },
     };
 
-    // Save the store data in a map or add to user's profile as needed.
+    STORES.save(deps.storage, store.id, &store)?;
 
     Ok(Response::new().add_attribute("method", "create_store"))
 }
 pub fn create_request(
     deps: DepsMut,
     info: MessageInfo,
+    _env: Env,
     name: String,
     description: String,
     images: Vec<String>,
@@ -183,13 +208,13 @@ pub fn create_request(
         locked_seller_id: 0,
         description,
         images,
-        created_at: deps.api.block_time().seconds(),
+        created_at: _env.block.time.seconds(),
         lifecycle: RequestLifecycle::Pending,
         location: Location {
             latitude,
             longitude,
         },
-        updated_at: deps.api.block_time().seconds(),
+        updated_at: _env.block.time.seconds(),
     };
 
     // Save request in the REQUESTS map.
@@ -200,6 +225,7 @@ pub fn create_request(
 pub fn create_offer(
     deps: DepsMut,
     info: MessageInfo,
+    _env: Env,
     price: i128,
     images: Vec<String>,
     request_id: u64,
@@ -213,8 +239,8 @@ pub fn create_offer(
         store_name,
         seller_id: 1, // Assume seller_id is fetched from user profile
         is_accepted: false,
-        created_at: deps.api.block_time().seconds(),
-        updated_at: deps.api.block_time().seconds(),
+        created_at: _env.block.time.seconds(),
+        updated_at: _env.block.time.seconds(),
     };
 
     // Save the offer in the OFFERS map
@@ -222,10 +248,15 @@ pub fn create_offer(
 
     Ok(Response::new().add_attribute("method", "create_offer"))
 }
-pub fn accept_offer(deps: DepsMut, info: MessageInfo, offer_id: u64) -> StdResult<Response> {
+pub fn accept_offer(
+    deps: DepsMut,
+    info: MessageInfo,
+    _env: Env,
+    offer_id: u64,
+) -> StdResult<Response> {
     let mut offer = OFFERS.load(deps.storage, offer_id)?;
     offer.is_accepted = true;
-    offer.updated_at = deps.api.block_time().seconds();
+    offer.updated_at = _env.block.time.seconds();
 
     // Update the associated request lifecycle
     let mut request = REQUESTS.load(deps.storage, offer.request_id)?;
@@ -238,7 +269,12 @@ pub fn accept_offer(deps: DepsMut, info: MessageInfo, offer_id: u64) -> StdResul
     Ok(Response::new().add_attribute("method", "accept_offer"))
 }
 
-pub fn toggle_location(deps: DepsMut, info: MessageInfo, enabled: bool) -> StdResult<Response> {
+pub fn toggle_location(
+    deps: DepsMut,
+    info: MessageInfo,
+    _env: Env,
+    enabled: bool,
+) -> StdResult<Response> {
     let mut user = USERS.load(deps.storage, info.sender.as_bytes())?;
     user.location_enabled = enabled;
 
@@ -246,7 +282,12 @@ pub fn toggle_location(deps: DepsMut, info: MessageInfo, enabled: bool) -> StdRe
 
     Ok(Response::new().add_attribute("method", "toggle_location"))
 }
-pub fn remove_offer(deps: DepsMut, info: MessageInfo, offer_id: u64) -> StdResult<Response> {
+pub fn remove_offer(
+    deps: DepsMut,
+    info: MessageInfo,
+    _env: Env,
+    offer_id: u64,
+) -> StdResult<Response> {
     let offer = OFFERS.load(deps.storage, offer_id)?;
 
     if offer.is_accepted {

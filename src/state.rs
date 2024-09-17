@@ -81,4 +81,5 @@ pub struct Offer {
 // State
 pub const USERS: Map<&[u8], User> = Map::new("users");
 pub const REQUESTS: Map<u64, Request> = Map::new("requests");
+pub const STORES: Map<u64, Store> = Map::new("stores");
 pub const OFFERS: Map<u64, Offer> = Map::new("offers");
