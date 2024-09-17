@@ -205,20 +205,12 @@ pub fn create_store(
     };
 
     STORES.save(deps.storage, store.id, &store)?;
-    // USER_STORE_IDS.update(
-    //     deps.storage,
-    //     info.sender.as_bytes(),
-    //     |existing| match existing {
-    //         Some(mut stores) => {
-    //             stores.push(store.id);
-    //             Ok(stores)
-    //         }
-    //         None => Ok(vec![store.id]),
-    //     },
-    // )?;
-
+    let mut store_ids = USER_STORE_IDS
+        .load(deps.storage, info.sender.as_bytes())
+        .unwrap_or_default();
+    store_ids.push(store.id);
+    USER_STORE_IDS.save(deps.storage, info.sender.as_bytes(), &store_ids)?;
     STORE_COUNT.save(deps.storage, &(store_count + 1))?;
-
     Ok(Response::new().add_attribute("method", "create_store"))
 }
 pub fn create_request(
