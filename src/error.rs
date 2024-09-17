@@ -2,15 +2,27 @@ use cosmwasm_std::StdError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ContractError {
-    #[error("{0}")]
-    Std(#[from] StdError),
-
-    #[error("Unauthorized")]
-    Unauthorized {},
-
-    #[error("Custom Error val: {val:?}")]
-    CustomError { val: String },
-    // Add any other custom errors you like here.
-    // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+pub enum MarketplaceError {
+    #[error("User already exists.")]
+    UserAlreadyExists,
+    #[error("Invalid account type.")]
+    InvalidAccountType,
+    #[error("Invalid user.")]
+    InvalidUser,
+    #[error("Only sellers allowed.")]
+    OnlySellersAllowed,
+    #[error("Only buyers allowed.")]
+    OnlyBuyersAllowed,
+    #[error("Unauthorized buyer.")]
+    UnauthorizedBuyer,
+    #[error("Offer already accepted.")]
+    OfferAlreadyAccepted,
+    #[error("Request locked.")]
+    RequestLocked,
+    #[error("Incorrect number of sellers.")]
+    IncorrectNumberOfSellers,
+    #[error("Request not accepted.")]
+    RequestNotAccepted,
+    #[error("Request not locked.")]
+    RequestNotLocked,
 }
