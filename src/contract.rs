@@ -22,6 +22,10 @@ pub fn instantiate(
     _msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    USER_COUNT.save(deps.storage, &1)?;
+    STORE_COUNT.save(deps.storage, &1)?;
+    REQUEST_COUNT.save(deps.storage, &1)?;
+    OFFER_COUNT.save(deps.storage, &1)?;
     Ok(Response::new().add_attribute("method", "instantiate"))
 }
 
