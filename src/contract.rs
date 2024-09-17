@@ -7,7 +7,7 @@ use crate::error::MarketplaceError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
     AccountType, Location, Offer, Request, RequestLifecycle, Store, User, OFFERS, OFFER_COUNT,
-    REQUESTS, REQUEST_COUNT, STORES, STORE_COUNT, USERS, USER_COUNT,
+    REQUESTS, REQUEST_COUNT, STORES, STORE_COUNT, TIME_TO_LOCK, USERS, USER_COUNT, USER_STORE_IDS,
 };
 
 // version info for migration info
@@ -109,7 +109,7 @@ pub fn execute(
         } => create_offer(deps, info, _env, price, images, request_id, store_name),
         ExecuteMsg::AcceptOffer { offer_id } => accept_offer(deps, info, _env, offer_id),
         ExecuteMsg::ToggleLocation { enabled } => toggle_location(deps, info, _env, enabled),
-        ExecuteMsg::RemoveOffer { offer_id } => remove_offer(deps, info, _env, offer_id),
+        ExecuteMsg::DeleteRequest { offer_id } => delete_request(deps, info, _env, offer_id),
     }
 }
 
@@ -197,6 +197,18 @@ pub fn create_store(
     };
 
     STORES.save(deps.storage, store.id, &store)?;
+    USER_STORE_IDS.update(
+        deps.storage,
+        info.sender.as_bytes(),
+        |existing| match existing {
+            Some(mut stores) => {
+                stores.push(store.id);
+                Ok(stores)
+            }
+            None => Ok(vec![store.id]),
+        },
+    )?;
+
     STORE_COUNT.save(deps.storage, &(store_count + 1))?;
 
     Ok(Response::new().add_attribute("method", "create_store"))
@@ -213,6 +225,10 @@ pub fn create_request(
 ) -> StdResult<Response> {
     let request_count = REQUEST_COUNT.load(deps.storage)?;
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
+
+    if user.account_type != AccountType::Buyer {
+        // return Err(MarketplaceError::OnlyBuyersAllowed.into());
+    }
     let request = Request {
         id: request_count,
         name,
@@ -248,6 +264,22 @@ pub fn create_offer(
 ) -> StdResult<Response> {
     let offer_count = OFFER_COUNT.load(deps.storage)?;
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
+
+    if user.account_type != AccountType::Seller {
+        // return Err(MarketplaceError::OnlySellersAllowed.into());
+    }
+
+    let mut request = REQUESTS.load(deps.storage, request_id)?;
+
+    if request.lifecycle != RequestLifecycle::Pending {
+        request.lifecycle = RequestLifecycle::AcceptedBySeller;
+    }
+
+    request.seller_ids.push(user.id);
+    request.offer_ids.push(offer_count);
+
+    REQUESTS.save(deps.storage, request.id, &request)?;
+
     let offer = Offer {
         id: offer_count,
         price,
@@ -272,13 +304,36 @@ pub fn accept_offer(
     offer_id: u64,
 ) -> StdResult<Response> {
     let mut offer = OFFERS.load(deps.storage, offer_id)?;
-    offer.is_accepted = true;
-    offer.updated_at = _env.block.time.seconds();
+    let buyer = USERS.load(deps.storage, info.sender.as_bytes())?;
+    let mut request = REQUESTS.load(deps.storage, offer.request_id)?;
+
+    if buyer.account_type != AccountType::Buyer {
+        // return Err(MarketplaceError::UnauthorizedBuyer);
+    }
+
+    if offer.is_accepted {
+        // return Err(MarketplaceError::OfferAlreadyAccepted);
+    }
 
     // Update the associated request lifecycle
-    let mut request = REQUESTS.load(deps.storage, offer.request_id)?;
+
+    if _env.block.time.seconds() > request.updated_at + TIME_TO_LOCK
+        && request.lifecycle == RequestLifecycle::AcceptedByBuyer
+    {
+        // return Err(MarketplaceError::RequestLocked);
+    }
+
+    for offer_id in request.offer_ids.iter() {
+        let mut offer = OFFERS.load(deps.storage, *offer_id)?;
+        offer.is_accepted = false;
+        OFFERS.save(deps.storage, offer.id, &offer)?;
+    }
+
+    offer.is_accepted = true;
+    offer.updated_at = _env.block.time.seconds();
     request.lifecycle = RequestLifecycle::AcceptedByBuyer;
     request.locked_seller_id = offer.seller_id;
+    request.seller_price_quote = offer.price;
 
     OFFERS.save(deps.storage, offer.id, &offer)?;
     REQUESTS.save(deps.storage, request.id, &request)?;
@@ -286,21 +341,26 @@ pub fn accept_offer(
     Ok(Response::new().add_attribute("method", "accept_offer"))
 }
 
-pub fn remove_offer(
+pub fn delete_request(
     deps: DepsMut,
     info: MessageInfo,
     _env: Env,
-    offer_id: u64,
+    request_id: u64,
 ) -> StdResult<Response> {
-    let offer = OFFERS.load(deps.storage, offer_id)?;
+    let request = REQUESTS.load(deps.storage, request_id)?;
+    let user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
-    if offer.is_accepted {
-        return Err(StdError::generic_err("Cannot remove accepted offer"));
+    if user.id != request.buyer_id {
+        // return Err(MarketplaceError::UnauthorizedBuyer);
     }
 
-    OFFERS.remove(deps.storage, offer_id);
+    if request.lifecycle != RequestLifecycle::Pending {
+        // return Err(MarketplaceError::RequestLocked);
+    }
 
-    Ok(Response::new().add_attribute("method", "remove_offer"))
+    REQUESTS.remove(deps.storage, request_id);
+
+    Ok(Response::new().add_attribute("method", "delete_request"))
 }
 
 pub fn toggle_location(

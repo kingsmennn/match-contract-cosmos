@@ -83,7 +83,11 @@ pub const USERS: Map<&[u8], User> = Map::new("users");
 pub const REQUESTS: Map<u64, Request> = Map::new("requests");
 pub const STORES: Map<u64, Store> = Map::new("stores");
 pub const OFFERS: Map<u64, Offer> = Map::new("offers");
+pub const USER_STORE_IDS: Map<&[u8], Vec<u64>> = Map::new("user_store_ids");
+
 pub const REQUEST_COUNT: Item<u64> = Item::new("request_count");
 pub const OFFER_COUNT: Item<u64> = Item::new("offer_count");
 pub const USER_COUNT: Item<u64> = Item::new("user_count");
 pub const STORE_COUNT: Item<u64> = Item::new("store_count");
+
+pub const TIME_TO_LOCK: u64 = 900; // 15 minutes

@@ -49,7 +49,7 @@ pub enum ExecuteMsg {
     ToggleLocation {
         enabled: bool,
     },
-    RemoveOffer {
+    DeleteRequest {
         offer_id: u64,
     },
 }
