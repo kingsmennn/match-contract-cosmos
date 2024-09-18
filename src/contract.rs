@@ -434,8 +434,14 @@ pub fn query_user(deps: Deps, address: String) -> StdResult<User> {
 
 pub fn get_user_stores(deps: Deps, address: String) -> StdResult<Vec<Store>> {
     let addr = deps.api.addr_validate(&address)?;
-    let user: User = USERS.load(deps.storage, addr.as_bytes())?;
-    Ok(vec![])
+
+    let store_ids = USER_STORE_IDS.load(deps.storage, addr.as_bytes())?;
+    let stores: Vec<Store> = store_ids
+        .iter()
+        .map(|store_id| STORES.load(deps.storage, *store_id))
+        .collect::<StdResult<Vec<Store>>>()?;
+
+    Ok(stores)
 }
 
 pub fn query_request(deps: Deps, request_id: u64) -> StdResult<Request> {
