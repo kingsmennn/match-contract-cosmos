@@ -22,7 +22,7 @@ pub fn instantiate(
     _env: Env,
     _info: MessageInfo,
     _msg: InstantiateMsg,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     USER_COUNT.save(deps.storage, &1)?;
     STORE_COUNT.save(deps.storage, &1)?;
@@ -37,7 +37,7 @@ pub fn execute(
     _env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     match msg {
         ExecuteMsg::CreateUser {
             username,
@@ -127,7 +127,7 @@ pub fn create_user(
     latitude: i128,
     longitude: i128,
     account_type: AccountType,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     let user_count = USER_COUNT.load(deps.storage)?;
     let user = User {
         id: user_count,
@@ -158,7 +158,7 @@ pub fn update_user(
     latitude: i128,
     longitude: i128,
     account_type: AccountType,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     let mut user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
     user.username = username;
@@ -184,14 +184,12 @@ pub fn create_store(
     phone: String,
     latitude: i128,
     longitude: i128,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
     let store_count = STORE_COUNT.load(deps.storage)?;
 
     if user.account_type != AccountType::Seller {
-        return Err(StdError::generic_err(
-            MarketplaceError::OnlySellersAllowed.to_string(),
-        ));
+        return Err(MarketplaceError::OnlySellersAllowed);
     }
     let store = Store {
         id: store_count, // Logic for unique ID
@@ -222,14 +220,12 @@ pub fn create_request(
     images: Vec<String>,
     latitude: i128,
     longitude: i128,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     let request_count = REQUEST_COUNT.load(deps.storage)?;
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
     if user.account_type != AccountType::Buyer {
-        return Err(StdError::generic_err(
-            MarketplaceError::OnlyBuyersAllowed.to_string(),
-        ));
+        return Err(MarketplaceError::OnlyBuyersAllowed);
     }
     let request = Request {
         id: request_count,
@@ -263,14 +259,12 @@ pub fn create_offer(
     images: Vec<String>,
     request_id: u64,
     store_name: String,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     let offer_count = OFFER_COUNT.load(deps.storage)?;
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
     if user.account_type != AccountType::Seller {
-        return Err(StdError::generic_err(
-            MarketplaceError::OnlySellersAllowed.to_string(),
-        ));
+        return Err(MarketplaceError::OnlySellersAllowed);
     }
 
     let mut request = REQUESTS.load(deps.storage, request_id)?;
@@ -306,29 +300,23 @@ pub fn accept_offer(
     info: MessageInfo,
     _env: Env,
     offer_id: u64,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     let mut offer = OFFERS.load(deps.storage, offer_id)?;
     let buyer = USERS.load(deps.storage, info.sender.as_bytes())?;
     let mut request = REQUESTS.load(deps.storage, offer.request_id)?;
 
     if buyer.account_type != AccountType::Buyer {
-        return Err(StdError::generic_err(
-            MarketplaceError::OnlyBuyersAllowed.to_string(),
-        ));
+        return Err(MarketplaceError::OnlyBuyersAllowed);
     }
 
     if offer.is_accepted {
-        return Err(StdError::generic_err(
-            MarketplaceError::OfferAlreadyAccepted.to_string(),
-        ));
+        return Err(MarketplaceError::OfferAlreadyAccepted);
     }
 
     if _env.block.time.seconds() > request.updated_at + TIME_TO_LOCK
         && request.lifecycle == RequestLifecycle::AcceptedByBuyer
     {
-        return Err(StdError::generic_err(
-            MarketplaceError::RequestLocked.to_string(),
-        ));
+        return Err(MarketplaceError::RequestLocked);
     }
 
     for offer_id in request.offer_ids.iter() {
@@ -354,20 +342,16 @@ pub fn delete_request(
     info: MessageInfo,
     _env: Env,
     request_id: u64,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     let request = REQUESTS.load(deps.storage, request_id)?;
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
     if user.id != request.buyer_id {
-        return Err(StdError::generic_err(
-            MarketplaceError::UnauthorizedBuyer.to_string(),
-        ));
+        return Err(MarketplaceError::UnauthorizedBuyer);
     }
 
     if request.lifecycle != RequestLifecycle::Pending {
-        return Err(StdError::generic_err(
-            MarketplaceError::RequestLocked.to_string(),
-        ));
+        return Err(MarketplaceError::RequestLocked);
     }
 
     REQUESTS.remove(deps.storage, request_id);
@@ -380,7 +364,7 @@ pub fn toggle_location(
     info: MessageInfo,
     _env: Env,
     enabled: bool,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     let mut user = USERS.load(deps.storage, info.sender.as_bytes())?;
     user.location_enabled = enabled;
 
@@ -394,32 +378,24 @@ pub fn mark_request_as_completed(
     info: MessageInfo,
     _env: Env,
     request_id: u64,
-) -> StdResult<Response> {
+) -> Result<Response, MarketplaceError> {
     let mut request = REQUESTS.load(deps.storage, request_id)?;
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
 
     if user.id != request.buyer_id {
-        return Err(StdError::generic_err(
-            MarketplaceError::UnauthorizedBuyer.to_string(),
-        ));
+        return Err(MarketplaceError::UnauthorizedBuyer);
     }
 
     if request.lifecycle != RequestLifecycle::AcceptedByBuyer {
-        return Err(StdError::generic_err(
-            MarketplaceError::RequestNotAccepted.to_string(),
-        ));
+        return Err(MarketplaceError::RequestNotAccepted);
     }
 
     if request.updated_at.checked_add(TIME_TO_LOCK).unwrap() > _env.block.time.seconds() {
-        return Err(StdError::generic_err(
-            MarketplaceError::RequestNotLocked.to_string(),
-        ));
+        return Err(MarketplaceError::RequestNotLocked);
     }
 
     if user.account_type != AccountType::Buyer {
-        return Err(StdError::generic_err(
-            MarketplaceError::OnlyBuyersAllowed.to_string(),
-        ));
+        return Err(MarketplaceError::OnlyBuyersAllowed);
     }
 
     request.lifecycle = RequestLifecycle::Completed;
