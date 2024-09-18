@@ -64,9 +64,13 @@ pub enum QueryMsg {
 
     GetRequest { request_id: u64 },
 
+    GetAllRequests {},
+
+    GetUserRequests { address: String },
+
     GetOffer { offer_id: u64 },
 
-    GetOffersForRequest { request_id: u64 },
+    GetOffersByRequest { request_id: u64 },
 
     GetLocationPreference { address: String },
     GetUserStores { address: String },

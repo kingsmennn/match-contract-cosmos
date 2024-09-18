@@ -409,8 +409,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetUser { address } => to_binary(&query_user(deps, address)?),
         QueryMsg::GetRequest { request_id } => to_binary(&query_request(deps, request_id)?),
+        QueryMsg::GetAllRequests {} => to_binary(&query_all_requests(deps)?),
         QueryMsg::GetOffer { offer_id } => to_binary(&query_offer(deps, offer_id)?),
-        QueryMsg::GetOffersForRequest { request_id } => {
+        QueryMsg::GetOffersByRequest { request_id } => {
             to_binary(&query_offers_for_request(deps, request_id)?)
         }
 
@@ -420,6 +421,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
 
         QueryMsg::GetUserStores { address } => to_binary(&query_user(deps, address)?),
+
+        QueryMsg::GetUserRequests { address } => to_binary(&get_user_requests(deps, address)?),
     }
 }
 
@@ -440,6 +443,18 @@ pub fn query_request(deps: Deps, request_id: u64) -> StdResult<Request> {
     Ok(request)
 }
 
+pub fn query_all_requests(deps: Deps) -> StdResult<Vec<Request>> {
+    let requests: Vec<Request> = REQUESTS
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .map(|item| {
+            let (_, request) = item?;
+            Ok(request)
+        })
+        .collect::<StdResult<Vec<Request>>>()?;
+
+    Ok(requests)
+}
+
 pub fn query_offer(deps: Deps, offer_id: u64) -> StdResult<Offer> {
     let offer = OFFERS.load(deps.storage, offer_id)?;
     Ok(offer)
@@ -453,6 +468,20 @@ pub fn query_offers_for_request(deps: Deps, request_id: u64) -> StdResult<Vec<Of
         .map(|offer_id| OFFERS.load(deps.storage, *offer_id))
         .collect::<StdResult<Vec<Offer>>>()?;
     Ok(offers)
+}
+
+pub fn get_user_requests(deps: Deps, address: String) -> StdResult<Vec<Request>> {
+    let addr: cosmwasm_std::Addr = deps.api.addr_validate(&address)?;
+    let user = USERS.load(deps.storage, addr.as_bytes())?;
+    let requests: Vec<Request> = REQUESTS
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .map(|item| {
+            let (_, request) = item?;
+            Ok(request)
+        })
+        .collect::<StdResult<Vec<Request>>>()?;
+
+    Ok(requests)
 }
 
 // #[cfg(test)]
