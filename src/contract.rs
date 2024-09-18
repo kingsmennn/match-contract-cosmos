@@ -412,7 +412,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetAllRequests {} => to_binary(&query_all_requests(deps)?),
         QueryMsg::GetOffer { offer_id } => to_binary(&query_offer(deps, offer_id)?),
         QueryMsg::GetOffersByRequest { request_id } => {
-            to_binary(&query_offers_for_request(deps, request_id)?)
+            to_binary(&query_offers_by_request(deps, request_id)?)
         }
 
         QueryMsg::GetLocationPreference { address } => {
@@ -420,9 +420,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&user.location_enabled)
         }
 
-        QueryMsg::GetUserStores { address } => to_binary(&query_user(deps, address)?),
+        QueryMsg::GetUserStores { address } => to_binary(&get_user_stores(deps, address)?),
 
         QueryMsg::GetUserRequests { address } => to_binary(&get_user_requests(deps, address)?),
+
+        QueryMsg::GetSellerOffers { address } => to_binary(&get_seller_offers(deps, address)?),
     }
 }
 
@@ -442,6 +444,12 @@ pub fn get_user_stores(deps: Deps, address: String) -> StdResult<Vec<Store>> {
         .collect::<StdResult<Vec<Store>>>()?;
 
     Ok(stores)
+}
+
+pub fn get_seller_offers(deps: Deps, address: String) -> StdResult<Vec<Offer>> {
+    let addr = deps.api.addr_validate(&address)?;
+    // TODO: implement
+    Ok(vec![])
 }
 
 pub fn query_request(deps: Deps, request_id: u64) -> StdResult<Request> {
@@ -466,7 +474,7 @@ pub fn query_offer(deps: Deps, offer_id: u64) -> StdResult<Offer> {
     Ok(offer)
 }
 
-pub fn query_offers_for_request(deps: Deps, request_id: u64) -> StdResult<Vec<Offer>> {
+pub fn query_offers_by_request(deps: Deps, request_id: u64) -> StdResult<Vec<Offer>> {
     let request = REQUESTS.load(deps.storage, request_id)?;
     let offers: Vec<Offer> = request
         .offer_ids
@@ -478,6 +486,7 @@ pub fn query_offers_for_request(deps: Deps, request_id: u64) -> StdResult<Vec<Of
 
 pub fn get_user_requests(deps: Deps, address: String) -> StdResult<Vec<Request>> {
     let addr: cosmwasm_std::Addr = deps.api.addr_validate(&address)?;
+    // TODO: implement not working well
     let user = USERS.load(deps.storage, addr.as_bytes())?;
     let requests: Vec<Request> = REQUESTS
         .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)

@@ -74,4 +74,6 @@ pub enum QueryMsg {
 
     GetLocationPreference { address: String },
     GetUserStores { address: String },
+
+    GetSellerOffers { address: String },
 }
