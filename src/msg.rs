@@ -62,15 +62,9 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     GetUser { address: String },
 
-    GetAllUsers {},
-
     GetRequest { request_id: u64 },
-
-    GetAllRequests {},
 
     GetOffer { offer_id: u64 },
 
     GetOffersForRequest { request_id: u64 },
-
-    GetAllOffers {},
 }

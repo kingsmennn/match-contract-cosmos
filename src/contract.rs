@@ -434,14 +434,11 @@ pub fn mark_request_as_completed(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetUser { address } => to_binary(&query_user(deps, address)?),
-        QueryMsg::GetAllUsers {} => to_binary(&query_all_users(deps)?),
         QueryMsg::GetRequest { request_id } => to_binary(&query_request(deps, request_id)?),
-        QueryMsg::GetAllRequests {} => to_binary(&query_all_requests(deps)?),
         QueryMsg::GetOffer { offer_id } => to_binary(&query_offer(deps, offer_id)?),
         QueryMsg::GetOffersForRequest { request_id } => {
             to_binary(&query_offers_for_request(deps, request_id)?)
         }
-        QueryMsg::GetAllOffers {} => to_binary(&query_all_offers(deps)?),
     }
 }
 
@@ -451,33 +448,9 @@ pub fn query_user(deps: Deps, address: String) -> StdResult<User> {
     Ok(user)
 }
 
-pub fn query_all_users(deps: Deps) -> StdResult<Vec<User>> {
-    let users: Vec<User> = USERS
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .map(|item| {
-            let (_, user) = item?;
-            Ok(user)
-        })
-        .collect::<StdResult<Vec<User>>>()?;
-
-    Ok(users)
-}
-
 pub fn query_request(deps: Deps, request_id: u64) -> StdResult<Request> {
     let request = REQUESTS.load(deps.storage, request_id)?;
     Ok(request)
-}
-
-pub fn query_all_requests(deps: Deps) -> StdResult<Vec<Request>> {
-    let requests: Vec<Request> = REQUESTS
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .map(|item| {
-            let (_, request) = item?;
-            Ok(request)
-        })
-        .collect::<StdResult<Vec<Request>>>()?;
-
-    Ok(requests)
 }
 
 pub fn query_offer(deps: Deps, offer_id: u64) -> StdResult<Offer> {
@@ -492,18 +465,6 @@ pub fn query_offers_for_request(deps: Deps, request_id: u64) -> StdResult<Vec<Of
         .iter()
         .map(|offer_id| OFFERS.load(deps.storage, *offer_id))
         .collect::<StdResult<Vec<Offer>>>()?;
-    Ok(offers)
-}
-
-pub fn query_all_offers(deps: Deps) -> StdResult<Vec<Offer>> {
-    let offers: Vec<Offer> = OFFERS
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .map(|item| {
-            let (_, offer) = item?;
-            Ok(offer)
-        })
-        .collect::<StdResult<Vec<Offer>>>()?;
-
     Ok(offers)
 }
 
