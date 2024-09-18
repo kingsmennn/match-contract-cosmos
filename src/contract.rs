@@ -7,7 +7,8 @@ use crate::error::MarketplaceError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
     AccountType, Location, Offer, Request, RequestLifecycle, Store, User, OFFERS, OFFER_COUNT,
-    REQUESTS, REQUEST_COUNT, STORES, STORE_COUNT, TIME_TO_LOCK, USERS, USER_COUNT, USER_STORE_IDS,
+    REQUESTS, REQUEST_COUNT, STORES, STORE_COUNT, TIME_TO_LOCK, USERS, USERS_BY_ID, USER_COUNT,
+    USER_STORE_IDS,
 };
 
 // version info for migration info
@@ -142,6 +143,7 @@ pub fn create_user(
     };
 
     USERS.save(deps.storage, info.sender.as_bytes(), &user)?;
+    let _ = USERS_BY_ID.save(deps.storage, user_count, &user);
     USER_COUNT.save(deps.storage, &(user_count + 1))?;
 
     Ok(Response::new().add_attribute("method", "create_user"))
@@ -425,12 +427,19 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetUserRequests { address } => to_binary(&get_user_requests(deps, address)?),
 
         QueryMsg::GetSellerOffers { address } => to_binary(&get_seller_offers(deps, address)?),
+
+        QueryMsg::GetUserById { user_id } => to_binary(&get_user_by_id(deps, user_id)?),
     }
 }
 
 pub fn query_user(deps: Deps, address: String) -> StdResult<User> {
     let addr = deps.api.addr_validate(&address)?;
     let user = USERS.load(deps.storage, addr.as_bytes())?;
+    Ok(user)
+}
+
+pub fn get_user_by_id(deps: Deps, user_id: u64) -> StdResult<User> {
+    let user = USERS_BY_ID.load(deps.storage, user_id)?;
     Ok(user)
 }
 

@@ -72,6 +72,8 @@ pub enum QueryMsg {
 
     GetOffersByRequest { request_id: u64 },
 
+    GetUserById { user_id: u64 },
+
     GetLocationPreference { address: String },
     GetUserStores { address: String },
 
