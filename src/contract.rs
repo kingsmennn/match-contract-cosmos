@@ -109,7 +109,7 @@ pub fn execute(
         } => create_offer(deps, info, _env, price, images, request_id, store_name),
         ExecuteMsg::AcceptOffer { offer_id } => accept_offer(deps, info, _env, offer_id),
         ExecuteMsg::ToggleLocation { enabled } => toggle_location(deps, info, _env, enabled),
-        ExecuteMsg::DeleteRequest { offer_id } => delete_request(deps, info, _env, offer_id),
+        ExecuteMsg::DeleteRequest { request_id } => delete_request(deps, info, _env, request_id),
         ExecuteMsg::MarkRequestAsCompleted { request_id } => {
             mark_request_as_completed(deps, info, _env, request_id)
         }
@@ -413,6 +413,13 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetOffersForRequest { request_id } => {
             to_binary(&query_offers_for_request(deps, request_id)?)
         }
+
+        QueryMsg::GetLocationPreference { address } => {
+            let user = USERS.load(deps.storage, deps.api.addr_validate(&address)?.as_bytes())?;
+            to_binary(&user.location_enabled)
+        }
+
+        QueryMsg::GetUserStores { address } => to_binary(&query_user(deps, address)?),
     }
 }
 
@@ -420,6 +427,12 @@ pub fn query_user(deps: Deps, address: String) -> StdResult<User> {
     let addr = deps.api.addr_validate(&address)?;
     let user = USERS.load(deps.storage, addr.as_bytes())?;
     Ok(user)
+}
+
+pub fn get_user_stores(deps: Deps, address: String) -> StdResult<Vec<Store>> {
+    let addr = deps.api.addr_validate(&address)?;
+    let user: User = USERS.load(deps.storage, addr.as_bytes())?;
+    Ok(vec![])
 }
 
 pub fn query_request(deps: Deps, request_id: u64) -> StdResult<Request> {

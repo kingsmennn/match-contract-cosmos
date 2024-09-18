@@ -50,7 +50,7 @@ pub enum ExecuteMsg {
         enabled: bool,
     },
     DeleteRequest {
-        offer_id: u64,
+        request_id: u64,
     },
     MarkRequestAsCompleted {
         request_id: u64,
@@ -67,4 +67,7 @@ pub enum QueryMsg {
     GetOffer { offer_id: u64 },
 
     GetOffersForRequest { request_id: u64 },
+
+    GetLocationPreference { address: String },
+    GetUserStores { address: String },
 }
