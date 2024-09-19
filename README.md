@@ -109,7 +109,7 @@ To deploy the contract on a CosmWasm-compatible blockchain (e.g., Osmosis):
 ### 1. Store the Contract on the Blockchain
 
 ```bash
-RES=$(osmosisd tx wasm store target/wasm32-unknown-unknown/release/match_cosmos_contract.wasm --from wallet --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 -y --output json -b block --node https://rpc.testnet.osmosis.zone:443 --chain-id osmo-test-5)
+RES=$(osmosisd tx wasm store target/wasm32-unknown-unknown/release/match_cosmos_contract.wasm --from wallet --gas-prices 0.5uosmo --gas auto --gas-adjustment 1.3 -y --output json -b block --node https://rpc.testnet.osmosis.zone:443 --chain-id osmo-test-5)
 ```
 
 ### 2. Install JQ (Optional for JSON Processing)
