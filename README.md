@@ -1,106 +1,176 @@
-# CosmWasm Starter Pack
+# Match Cosmos Marketplace Contract
 
-This is a template to build smart contracts in Rust to run inside a
-[Cosmos SDK](https://github.com/cosmos/cosmos-sdk) module on all chains that enable it.
-To understand the framework better, please read the overview in the
-[cosmwasm repo](https://github.com/CosmWasm/cosmwasm/blob/master/README.md),
-and dig into the [cosmwasm docs](https://www.cosmwasm.com).
-This assumes you understand the theory and just want to get coding.
+This is a CosmWasm-based smart contract for creating and managing a decentralized marketplace. Buyers and sellers can interact via requests and offers to exchange goods or services securely.
 
-## Creating a new repo from template
+## Features
 
-Assuming you have a recent version of rust and cargo (v1.58.1+) installed
-(via [rustup](https://rustup.rs/)),
-then the following should get you a new repo to start a contract:
+- **User Profiles**: Register, update, and manage user profiles.
+- **Store Creation**: Sellers can create stores for buyers to browse.
+- **Requests & Offers**: Buyers can create requests, and sellers can respond with offers.
+- **Offer Acceptance**: Buyers can accept offers and proceed with transactions.
+- **Lifecycle Management**: Requests and offers follow a lifecycle (Pending, Accepted, Locked, Completed).
 
-Install [cargo-generate](https://github.com/ashleygwilliams/cargo-generate) and cargo-run-script.
-Unless you did that before, run this line now:
+## Contract Architecture
 
-```sh
+### State Variables
+
+- **`User`**: Stores user details like username, phone number, account type (Buyer/Seller), and location.
+- **`Store`**: Represents a seller’s store.
+- **`Request`**: Represents a product or service request from a buyer.
+- **`Offer`**: Represents an offer from a seller in response to a buyer's request.
+
+### Execute Messages (`ExecuteMsg`)
+
+- `CreateUser`: Register a user with details like username, phone, and account type.
+- `UpdateUser`: Update user profile information.
+- `CreateStore`: Sellers create a store with details like name, description, and location.
+- `CreateRequest`: Buyers create a request for goods or services.
+- `CreateOffer`: Sellers respond to requests with offers.
+- `AcceptOffer`: Buyers accept offers to lock the request.
+- `DeleteRequest`: Buyers delete their pending requests.
+- `ToggleLocation`: Enable or disable location tracking.
+- `MarkRequestAsCompleted`: Confirm request completion by the buyer.
+
+### Query Messages (`QueryMsg`)
+
+- `GetUser`: Retrieve user information by address.
+- `GetRequest`: Get details of a specific request.
+- `GetAllRequests`: Fetch all marketplace requests.
+- `GetOffer`: Get details of a specific offer.
+- `GetOffersByRequest`: Get all offers for a specific request.
+- `GetUserStores`: Get all stores created by a user.
+- `GetSellerOffers`: Fetch all offers made by a seller.
+
+## State Counters
+
+- **`USER_COUNT`**: Tracks the total number of users.
+- **`STORE_COUNT`**: Tracks the number of stores.
+- **`REQUEST_COUNT`**: Tracks the number of requests.
+- **`OFFER_COUNT`**: Tracks the number of offers.
+
+---
+
+## Installation
+
+Follow the steps below to build, test, and deploy the CosmWasm contract.
+
+### Prerequisites
+
+Ensure you have the following installed:
+
+- [Rust](https://www.rust-lang.org/tools/install)
+- CosmWasm CLI tools (`osmosisd`, `wasmcli`)
+
+### 1. Install Rust and Set the Default Toolchain
+
+```bash
+rustup default stable
+rustup update stable
+```
+
+### 2. Add WASM Compilation Target
+
+```bash
+rustup target add wasm32-unknown-unknown
+```
+
+### 3. Install Required Cargo Packages
+
+```bash
 cargo install cargo-generate --features vendored-openssl
 cargo install cargo-run-script
 ```
 
-Now, use it to create your new contract.
-Go to the folder in which you want to place it and run:
+### 4. Clone the Repository
 
-
-**Latest: 1.0.0-beta6**
-
-```sh
-cargo generate --git https://github.com/CosmWasm/cw-template.git --name PROJECT_NAME
-````
-
-**Older Version**
-
-Pass version as branch flag:
-
-```sh
-cargo generate --git https://github.com/CosmWasm/cw-template.git --branch <version> --name PROJECT_NAME
-````
-
-Example:
-
-```sh
-cargo generate --git https://github.com/CosmWasm/cw-template.git --branch 0.16 --name PROJECT_NAME
+```bash
+git clone https://github.com/kingsmennn/match-contract-cosmos
+cd match-contract-cosmos
 ```
 
-You will now have a new folder called `PROJECT_NAME` (I hope you changed that to something else)
-containing a simple working contract and build system that you can customize.
+### 5. Build the Contract
 
-## Create a Repo
-
-After generating, you have a initialized local git repo, but no commits, and no remote.
-Go to a server (eg. github) and create a new upstream repo (called `YOUR-GIT-URL` below).
-Then run the following:
-
-```sh
-# this is needed to create a valid Cargo.lock file (see below)
-cargo check
-git branch -M main
-git add .
-git commit -m 'Initial Commit'
-git remote add origin YOUR-GIT-URL
-git push -u origin main
+```bash
+cargo wasm
 ```
 
-## CI Support
+### 6. Run Tests
 
-We have template configurations for both [GitHub Actions](.github/workflows/Basic.yml)
-and [Circle CI](.circleci/config.yml) in the generated project, so you can
-get up and running with CI right away.
+```bash
+cargo test
+```
 
-One note is that the CI runs all `cargo` commands
-with `--locked` to ensure it uses the exact same versions as you have locally. This also means
-you must have an up-to-date `Cargo.lock` file, which is not auto-generated.
-The first time you set up the project (or after adding any dep), you should ensure the
-`Cargo.lock` file is updated, so the CI will test properly. This can be done simply by
-running `cargo check` or `cargo unit-test`.
+---
 
-## Using your project
+## Deployment
 
-Once you have your custom repo, you should check out [Developing](./Developing.md) to explain
-more on how to run tests and develop code. Or go through the
-[online tutorial](https://docs.cosmwasm.com/) to get a better feel
-of how to develop.
+To deploy the contract on a CosmWasm-compatible blockchain (e.g., Osmosis):
 
-[Publishing](./Publishing.md) contains useful information on how to publish your contract
-to the world, once you are ready to deploy it on a running blockchain. And
-[Importing](./Importing.md) contains information about pulling in other contracts or crates
-that have been published.
+### 1. Store the Contract on the Blockchain
 
-Please replace this README file with information about your specific project. You can keep
-the `Developing.md` and `Publishing.md` files as useful referenced, but please set some
-proper description in the README.
+```bash
+RES=$(osmosisd tx wasm store target/wasm32-unknown-unknown/release/match_cosmos_contract.wasm --from wallet --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 -y --output json -b block)
+```
 
-## Gitpod integration
+### 2. Install JQ (Optional for JSON Processing)
 
-[Gitpod](https://www.gitpod.io/) container-based development platform will be enabled on your project by default.
+- **Linux**:
+  ```bash
+  sudo apt-get install jq
+  ```
+- **Mac**:
+  ```bash
+  brew install jq
+  ```
 
-Workspace contains:
- - **rust**: for builds
- - [wasmd](https://github.com/CosmWasm/wasmd): for local node setup and client
- - **jq**: shell JSON manipulation tool
+### 3. Get the Contract Code ID
 
-Follow [Gitpod Getting Started](https://www.gitpod.io/docs/getting-started) and launch your workspace.
+```bash
+CODE_ID=$(echo $RES | jq -r '.logs[0].events[-1].attributes[0].value')
+```
 
+### 4. Instantiate the Contract
+
+Initialize the contract with the desired state:
+
+```bash
+INIT='{"count":100}'
+```
+
+Instantiate the contract:
+
+```bash
+osmosisd tx wasm instantiate $CODE_ID "$INIT" --from wallet --label "match-contract-cosmos" --gas-prices 0.025uosmo --gas auto --gas-adjustment 1.3 -b block -y --no-admin
+```
+
+### 5. Get the Contract Address
+
+```bash
+CONTRACT_ADDR=$(osmosisd query wasm list-contract-by-code $CODE_ID --output json | jq -r '.contracts[0]')
+```
+
+---
+
+## Error Handling
+
+The contract uses custom error types for handling exceptions, such as:
+
+- `MarketplaceError::OnlySellersAllowed`: Triggered when a non-seller performs seller-only actions.
+- `MarketplaceError::OfferAlreadyAccepted`: Triggered when a buyer tries to accept an already accepted offer.
+- `MarketplaceError::UnauthorizedBuyer`: Triggered when a user tries to delete someone else's request.
+
+---
+
+## Contributing
+
+We welcome contributions to improve this contract. To contribute:
+
+1. Fork the repository.
+2. Create a new branch for your feature or bug fix.
+3. Submit a pull request with a detailed description of the changes.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
