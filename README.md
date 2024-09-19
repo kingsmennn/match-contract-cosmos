@@ -59,7 +59,7 @@ Follow the steps below to build, test, and deploy the CosmWasm contract.
 Ensure you have the following installed:
 
 - [Rust](https://www.rust-lang.org/tools/install)
-- CosmWasm CLI tools (`osmosisd`, `wasmcli`) [osmosisd](https://docs.osmosis.zone/osmosis-core/osmosisd/)
+- CosmWasm CLI tools (`xion`, `wasmcli`) [xiond](https://docs.burnt.com/xion/nodes-and-validators/run-a-node/build-the-xion-daemon)
 
 ### 1. Install Rust and Set the Default Toolchain
 
@@ -104,7 +104,7 @@ cargo test
 
 ## Deployment
 
-To deploy the contract on a CosmWasm-compatible blockchain (e.g., Osmosis):
+To deploy the contract on a CosmWasm-compatible blockchain (e.g., xion):
 
 ### 1. Store the Contract on the Blockchain
 
@@ -140,7 +140,7 @@ INIT='{}'
 Instantiate the contract:
 
 ```bash
-xiond tx wasm instantiate $CODE_ID "$INIT" --from wallet --label "match-contract-cosmos" --gas-prices 0.025uosmo --gas auto --gas-adjustment 1.3 -b block -y --no-admin  --node https://rpc.testnet.osmosis.zone:443 --chain-id xion-testnet-1
+xiond tx wasm instantiate $CODE_ID "$INIT" --from wallet --label "match-contract-cosmos" --gas-prices 0.025uosmo --gas auto --gas-adjustment 1.3 -b block -y --no-admin  --node https://rpc.xion-testnet-1.burnt.com:443 --chain-id xion-testnet-1
 ```
 
 ### 5. Get the Contract Address
