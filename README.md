@@ -59,7 +59,7 @@ Follow the steps below to build, test, and deploy the CosmWasm contract.
 Ensure you have the following installed:
 
 - [Rust](https://www.rust-lang.org/tools/install)
-- CosmWasm CLI tools (`osmosisd`, `wasmcli`)
+- CosmWasm CLI tools (`osmosisd`, `wasmcli`) [osmosisd](https://docs.osmosis.zone/osmosis-core/osmosisd/)
 
 ### 1. Install Rust and Set the Default Toolchain
 
