@@ -109,7 +109,7 @@ To deploy the contract on a CosmWasm-compatible blockchain (e.g., Osmosis):
 ### 1. Store the Contract on the Blockchain
 
 ```bash
-RES=$(osmosisd tx wasm store target/wasm32-unknown-unknown/release/match_cosmos_contract.wasm --from wallet --gas-prices 0.5uosmo --gas auto --gas-adjustment 1.3 -y --output json -b block --node https://rpc.testnet.osmosis.zone:443 --chain-id osmo-test-5)
+RES=$(xiond tx wasm store target/wasm32-unknown-unknown/release/match_cosmos_contract.wasm --from test --gas-prices 0.5uosmo --gas auto --gas-adjustment 1.3 -y --output json -b block --node https://rpc.xion-testnet-1.burnt.com:443 --chain-id xion-testnet-1)
 ```
 
 ### 2. Install JQ (Optional for JSON Processing)
@@ -140,13 +140,13 @@ INIT='{}'
 Instantiate the contract:
 
 ```bash
-osmosisd tx wasm instantiate $CODE_ID "$INIT" --from wallet --label "match-contract-cosmos" --gas-prices 0.025uosmo --gas auto --gas-adjustment 1.3 -b block -y --no-admin  --node https://rpc.testnet.osmosis.zone:443 --chain-id osmo-test-5
+xiond tx wasm instantiate $CODE_ID "$INIT" --from wallet --label "match-contract-cosmos" --gas-prices 0.025uosmo --gas auto --gas-adjustment 1.3 -b block -y --no-admin  --node https://rpc.testnet.osmosis.zone:443 --chain-id xion-testnet-1
 ```
 
 ### 5. Get the Contract Address
 
 ```bash
-CONTRACT_ADDR=$(osmosisd query wasm list-contract-by-code $CODE_ID --output json | jq -r '.contracts[0]'  --node https://rpc.testnet.osmosis.zone:443 --chain-id osmo-test-5)
+CONTRACT_ADDR=$(xiond query wasm list-contract-by-code $CODE_ID --output json | jq -r '.contracts[0]' -node https://rpc.xion-testnet-1.burnt.com:443 --chain-id xion-testnet-1)
 ```
 
 ---
