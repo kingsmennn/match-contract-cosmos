@@ -154,7 +154,7 @@ xiond tx wasm instantiate $CODE_ID "$INIT" --from test --label "contract" --gas-
 ### 5. Get the Contract Address
 
 ```bash
-CONTRACT_ADDR=$(xiond query wasm list-contract-by-code $CODE_ID --output json | jq -r '.contracts[0]' -node https://rpc.xion-testnet-1.burnt.com:443 --chain-id xion-testnet-1)
+CONTRACT_ADDR=$(xiond query wasm list-contract-by-code $CODE_ID --output json  --node https://rpc.xion-testnet-1.burnt.com:443 | jq -r '.contracts[0]')
 ```
 
 ---
