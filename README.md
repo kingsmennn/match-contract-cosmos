@@ -114,6 +114,7 @@ RES=$(xiond tx wasm store target/wasm32-unknown-unknown/release/match_cosmos_con
     --gas-adjustment 1.3 \
     --gas-prices 0uxion \
     --gas auto \
+    --output json \
     --chain-id xion-testnet-1 \
     --node https://rpc.xion-testnet-1.burnt.com:443 \
     --from test)
