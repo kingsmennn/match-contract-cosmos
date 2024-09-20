@@ -111,8 +111,8 @@ To deploy the contract on a CosmWasm-compatible blockchain (e.g., xion):
 ```bash
 RES=$(xiond tx wasm store target/wasm32-unknown-unknown/release/match_cosmos_contract.wasm \
     --chain-id xion-local-testnet-1 \
-    --gas-adjustment 1.3 \
-    --gas-prices 0uxion \
+    --gas-adjustment 1.5 \
+    --gas-prices 0.5uxion \
     --gas auto \
     -y --output json \
     --chain-id xion-testnet-1 \
@@ -148,8 +148,7 @@ INIT='{}'
 Instantiate the contract:
 
 ```bash
-xiond tx wasm instantiate $CODE_ID "$INIT" \
-    --from wallet --label "my first contract" --gas-prices 0.025uxion --gas auto --gas-adjustment 1.3 -b block -y --no-admin
+xiond tx wasm instantiate $CODE_ID "$INIT" --from test --label "contract" --gas-prices 0.025uxion --gas auto --gas-adjustment 1.3 -b block -y --no-admin  --chain-id xion-testnet-1 --node https://rpc.xion-testnet-1.burnt.com:443
 ```
 
 ### 5. Get the Contract Address
