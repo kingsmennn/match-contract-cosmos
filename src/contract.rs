@@ -143,7 +143,7 @@ pub fn create_user(
     };
 
     USERS.save(deps.storage, info.sender.as_bytes(), &user)?;
-    let _ = USERS_BY_ID.save(deps.storage, user_count, &user);
+    USERS_BY_ID.save(deps.storage, user_count, &user)?;
     USER_COUNT.save(deps.storage, &(user_count + 1))?;
 
     Ok(Response::new().add_attribute("method", "create_user"))
