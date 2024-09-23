@@ -59,7 +59,7 @@ Follow the steps below to build, test, and deploy the CosmWasm contract.
 Ensure you have the following installed:
 
 - [Rust](https://www.rust-lang.org/tools/install)
-- CosmWasm CLI tools (`xion`, `wasmcli`) [xiond](https://docs.burnt.com/xion/nodes-and-validators/run-a-node/build-the-xion-daemon)
+- CosmWasm CLI tools (`osmosisd`, `wasmcli`) [osmosisd](https://docs.osmosis.zone/cosmwasm/testnet/cosmwasm-deployment/)
 
 ### 1. Install Rust and Set the Default Toolchain
 
@@ -104,20 +104,13 @@ cargo test
 
 ## Deployment
 
-To deploy the contract on a CosmWasm-compatible blockchain (e.g., xion):
+To deploy the contract on a CosmWasm-compatible blockchain (e.g., osmosisd):
 
 ### 1. Store the Contract on the Blockchain
 
 ```bash
-RES=$(xiond tx wasm store target/wasm32-unknown-unknown/release/match_cosmos_contract.wasm \
-    --chain-id xion-local-testnet-1 \
-    --gas-adjustment 1.5 \
-    --gas-prices 0.5uxion \
-    --gas auto \
-    -y --output json \
-    --chain-id xion-testnet-1 \
-    --node https://rpc.xion-testnet-1.burnt.com:443 \
-    --from test)
+RES=$(osmosisd tx wasm store artifacts/match_cosmos_contract.wasm --from wallet --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 -y --output json -b block --chain-id osmo-test-5 \
+    --node https://rpc.testnet.osmosis.zone:443)
 ```
 
 ### 2. Install JQ (Optional for JSON Processing)
@@ -148,13 +141,15 @@ INIT='{}'
 Instantiate the contract:
 
 ```bash
-xiond tx wasm instantiate $CODE_ID "$INIT" --from test --label "contract" --gas-prices 0.025uxion --gas auto --gas-adjustment 1.3 -b block -y --no-admin  --chain-id xion-testnet-1 --node https://rpc.xion-testnet-1.burnt.com:443
+osmosisd tx wasm instantiate $CODE_ID "$INIT" \
+    --from wallet --label "my first contract" --gas-prices 0.025uosmo --gas auto --gas-adjustment 1.3 -b block -y --no-admin --chain-id osmo-test-5 \
+    --node https://rpc.testnet.osmosis.zone:443
 ```
 
 ### 5. Get the Contract Address
 
 ```bash
-CONTRACT_ADDR=$(xiond query wasm list-contract-by-code $CODE_ID --output json  --node https://rpc.xion-testnet-1.burnt.com:443 | jq -r '.contracts[0]')
+CONTRACT_ADDR=$(osmosisd query wasm list-contract-by-code $CODE_ID --output json --node https://rpc.testnet.osmosis.zone:443 --chain-id osmo-test-5 | jq -r '.contracts[0]')
 ```
 
 ---
