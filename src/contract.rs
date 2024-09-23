@@ -445,8 +445,19 @@ pub fn get_user_by_id(deps: Deps, user_id: u64) -> StdResult<User> {
 
 pub fn get_user_stores(deps: Deps, address: String) -> StdResult<Vec<Store>> {
     let addr = deps.api.addr_validate(&address)?;
+    let stores = USER_STORE_IDS.may_load(deps.storage, addr.as_bytes());
 
-    let store_ids = USER_STORE_IDS.load(deps.storage, addr.as_bytes())?;
+    if stores.is_err() {
+        return Ok(vec![]);
+    }
+
+    let stored_id = stores.unwrap();
+
+    if stored_id.is_none() {
+        return Ok(vec![]);
+    }
+
+    let store_ids = stored_id.unwrap();
     let stores: Vec<Store> = store_ids
         .iter()
         .map(|store_id| STORES.load(deps.storage, *store_id))
@@ -495,13 +506,23 @@ pub fn query_offers_by_request(deps: Deps, request_id: u64) -> StdResult<Vec<Off
 
 pub fn get_user_requests(deps: Deps, address: String) -> StdResult<Vec<Request>> {
     let addr: cosmwasm_std::Addr = deps.api.addr_validate(&address)?;
-    // TODO: implement not working well
     let user = USERS.load(deps.storage, addr.as_bytes())?;
+
     let requests: Vec<Request> = REQUESTS
         .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .map(|item| {
-            let (_, request) = item?;
-            Ok(request)
+        .filter_map(|item| {
+            match item {
+                Ok((_, request)) => {
+                    // Filter based on the user's ID
+                    if request.buyer_id == user.id {
+                        Some(Ok(request))
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => None,
+                // Err(e) => Some(Err(e)),
+            }
         })
         .collect::<StdResult<Vec<Request>>>()?;
 
