@@ -140,6 +140,7 @@ pub fn create_user(
         updated_at: _env.block.time.seconds(),
         account_type,
         location_enabled: true,
+        authority: info.sender.clone(),
     };
 
     USERS.save(deps.storage, info.sender.as_bytes(), &user)?;
@@ -276,7 +277,7 @@ pub fn create_offer(
     request.seller_ids.push(user.id);
     request.offer_ids.push(offer_count);
 
-    REQUESTS.save(deps.storage, request.id, &request)?;
+    REQUESTS.save(deps.storage, request_id, &request)?;
 
     let offer = Offer {
         id: offer_count,
@@ -292,6 +293,7 @@ pub fn create_offer(
 
     OFFERS.save(deps.storage, offer.id, &offer)?;
     OFFER_COUNT.save(deps.storage, &(offer_count + 1))?;
+    deps.api.debug("Offer saved successfully");
 
     Ok(Response::new().add_attribute("method", "create_offer"))
 }
@@ -468,8 +470,27 @@ pub fn get_user_stores(deps: Deps, address: String) -> StdResult<Vec<Store>> {
 
 pub fn get_seller_offers(deps: Deps, address: String) -> StdResult<Vec<Offer>> {
     let addr = deps.api.addr_validate(&address)?;
-    // TODO: implement
-    Ok(vec![])
+    let user = USERS.load(deps.storage, addr.as_bytes())?;
+
+    let offers: Vec<Offer> = OFFERS
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .filter_map(|item| {
+            match item {
+                Ok((_, offer)) => {
+                    // Filter based on the user's ID
+                    if offer.seller_id == user.id {
+                        Some(Ok(offer))
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => None,
+                // Err(e) => Some(Err(e)),
+            }
+        })
+        .collect::<StdResult<Vec<Offer>>>()?;
+
+    Ok(offers)
 }
 
 pub fn query_request(deps: Deps, request_id: u64) -> StdResult<Request> {

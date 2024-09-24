@@ -1,3 +1,4 @@
+use cosmwasm_std::Addr;
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -44,6 +45,7 @@ pub struct User {
     pub updated_at: u64,
     pub account_type: AccountType,
     pub location_enabled: bool,
+    pub authority: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
