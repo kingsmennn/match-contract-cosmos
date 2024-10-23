@@ -87,21 +87,11 @@ pub struct Offer {
     pub authority: Addr,
 }
 
-// let mut new_payment_info = PaymentInfo {
-//     buyer: info.sender.clone(),
-//     request_id,
-//     payer: info.sender.clone(),
-//     authority: offer.authority.clone(),
-//     amount: Uint128::zero(),
-//     coin: coin.clone(),
-//     created_at: env.block.time.seconds(),
-//     updated_at: env.block.time.seconds(),
-// };
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PaymentInfo {
     pub buyer: Addr,
     pub request_id: u64,
-    pub payer: Addr,
+    pub seller: Addr,
     pub authority: Addr,
     pub amount: Uint128,
     pub coin: CoinPayment,

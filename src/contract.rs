@@ -8,8 +8,8 @@ use crate::state::{
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-    Uint128, WasmMsg,
+    to_json_binary, Addr, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ExecuteMsg;
@@ -389,6 +389,7 @@ pub fn mark_request_as_completed(
 ) -> Result<Response, MarketplaceError> {
     let mut request = REQUESTS.load(deps.storage, request_id)?;
     let user = USERS.load(deps.storage, info.sender.as_bytes())?;
+    let payment_info = PAYMENT_INFO.load(deps.storage, request_id)?;
 
     if user.id != request.buyer_id {
         return Err(MarketplaceError::UnauthorizedBuyer);
@@ -410,6 +411,41 @@ pub fn mark_request_as_completed(
     request.updated_at = _env.block.time.seconds();
 
     REQUESTS.save(deps.storage, request_id, &request)?;
+
+    let amount: u128 = payment_info.amount.into();
+
+    if amount > 0 {
+        if payment_info.coin == CoinPayment::USDT {
+            // Transfer USDT
+            let transfer_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: USDT_ADDR.to_string(),
+                msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: payment_info.seller.to_string(),
+                    amount: payment_info.amount.into(),
+                })?,
+                funds: vec![],
+            });
+
+            return Ok(Response::new()
+                .add_message(transfer_msg)
+                .add_attribute("method", "mark_request_as_completed"));
+        } else if payment_info.coin == CoinPayment::Cosmos {
+            // Transfer native tokens
+            let transfer_msg: CosmosMsg = CosmosMsg::Bank(cosmwasm_std::BankMsg::Send {
+                to_address: payment_info.seller.to_string(),
+                amount: vec![Coin {
+                    denom: COIN_DENOM.to_string(), // Replace with the correct denom
+                    amount: payment_info.amount,
+                }],
+            });
+
+            return Ok(Response::new()
+                .add_message(transfer_msg)
+                .add_attribute("method", "mark_request_as_completed"));
+        } else {
+            return Err(MarketplaceError::UnknownPaymentType);
+        }
+    }
 
     Ok(Response::new().add_attribute("method", "mark_request_as_completed"))
 }
@@ -451,8 +487,8 @@ pub fn pay_for_request_token(
     let mut new_payment_info = PaymentInfo {
         buyer: info.sender.clone(),
         request_id,
-        payer: info.sender.clone(),
-        authority: offer.authority.clone(),
+        seller: offer.authority.clone(),
+        authority: info.sender.clone(),
         amount: Uint128::zero(),
         coin: coin.clone(),
         created_at: env.block.time.seconds(),
@@ -527,8 +563,8 @@ pub fn pay_for_request(
     let mut new_payment_info = PaymentInfo {
         buyer: info.sender.clone(),
         request_id,
-        payer: info.sender.clone(),
-        authority: offer.authority.clone(),
+        authority: info.sender.clone(),
+        seller: offer.authority.clone(),
         amount: Uint128::zero(),
         coin: coin.clone(),
         created_at: env.block.time.seconds(),
