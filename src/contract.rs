@@ -616,6 +616,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetUserStores { address } => to_json_binary(&get_user_stores(deps, address)?),
 
         QueryMsg::GetUserRequests { address } => to_json_binary(&get_user_requests(deps, address)?),
+        QueryMsg::GetUserPaymentHistory { address } => {
+            to_json_binary(&get_user_payment_history(deps, address)?)
+        }
 
         QueryMsg::GetSellerOffers { address } => to_json_binary(&get_seller_offers(deps, address)?),
 
@@ -737,6 +740,29 @@ pub fn get_user_requests(deps: Deps, address: String) -> StdResult<Vec<Request>>
         .collect::<StdResult<Vec<Request>>>()?;
 
     Ok(requests)
+}
+pub fn get_user_payment_history(deps: Deps, address: String) -> StdResult<Vec<PaymentInfo>> {
+    let addr: cosmwasm_std::Addr = deps.api.addr_validate(&address)?;
+    let user = USERS.load(deps.storage, addr.as_bytes())?;
+
+    let payments: Vec<PaymentInfo> = PAYMENT_INFO
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .filter_map(|item| {
+            match item {
+                Ok((_, payment_info)) => {
+                    // Filter based on the user's ID
+                    if payment_info.authority == user.authority {
+                        Some(Ok(payment_info))
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => None,
+            }
+        })
+        .collect::<StdResult<Vec<PaymentInfo>>>()?;
+
+    Ok(payments)
 }
 
 // #[cfg(test)]

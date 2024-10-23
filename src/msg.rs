@@ -67,6 +67,7 @@ pub enum QueryMsg {
     GetAllRequests {},
 
     GetUserRequests { address: String },
+    GetUserPaymentHistory { address: String },
 
     GetOffer { offer_id: u64 },
 
