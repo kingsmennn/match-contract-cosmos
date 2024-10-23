@@ -1,15 +1,18 @@
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
-use cw2::set_contract_version;
-
 use crate::error::MarketplaceError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
-    AccountType, Location, Offer, Request, RequestLifecycle, Store, User, OFFERS, OFFER_COUNT,
-    REQUESTS, REQUEST_COUNT, STORES, STORE_COUNT, TIME_TO_LOCK, USERS, USERS_BY_ID, USER_COUNT,
-    USER_STORE_IDS,
+    AccountType, CoinPayment, Location, Offer, PaymentInfo, Request, RequestLifecycle, Store, User,
+    COIN_DENOM, OFFERS, OFFER_COUNT, PAYMENT_INFO, REQUESTS, REQUEST_COUNT, STORES, STORE_COUNT,
+    TIME_TO_LOCK, USDT_ADDR, USERS, USERS_BY_ID, USER_COUNT, USER_STORE_IDS,
 };
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+use cosmwasm_std::{
+    to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    Uint128, WasmMsg,
+};
+use cw2::set_contract_version;
+use cw20::Cw20ExecuteMsg;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:marketplace";
@@ -245,6 +248,8 @@ pub fn create_request(
             longitude,
         },
         updated_at: _env.block.time.seconds(),
+        paid: false,
+        accepted_offer_id: 0,
     };
 
     REQUESTS.save(deps.storage, request.id, &request)?;
@@ -256,7 +261,7 @@ pub fn create_offer(
     deps: DepsMut,
     info: MessageInfo,
     _env: Env,
-    price: i128,
+    price: u128,
     images: Vec<String>,
     request_id: u64,
     store_name: String,
@@ -289,6 +294,7 @@ pub fn create_offer(
         is_accepted: false,
         created_at: _env.block.time.seconds(),
         updated_at: _env.block.time.seconds(),
+        authority: info.sender.clone(),
     };
 
     OFFERS.save(deps.storage, offer.id, &offer)?;
@@ -388,7 +394,7 @@ pub fn mark_request_as_completed(
         return Err(MarketplaceError::UnauthorizedBuyer);
     }
 
-    if request.lifecycle != RequestLifecycle::AcceptedByBuyer {
+    if request.lifecycle != RequestLifecycle::Paid {
         return Err(MarketplaceError::RequestNotAccepted);
     }
 
@@ -408,29 +414,178 @@ pub fn mark_request_as_completed(
     Ok(Response::new().add_attribute("method", "mark_request_as_completed"))
 }
 
+pub fn pay_for_request_token(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    request_id: u64,
+    coin: CoinPayment,
+) -> Result<Response, MarketplaceError> {
+    let mut request = REQUESTS.load(deps.storage, request_id)?;
+    let offer_id = request.accepted_offer_id;
+    let offer = OFFERS.load(deps.storage, offer_id)?;
+
+    let user = USERS.load(deps.storage, info.sender.as_bytes())?;
+
+    if request.paid {
+        return Err(MarketplaceError::RequestAlreadyPaid);
+    }
+
+    if request.buyer_id != user.id {
+        return Err(MarketplaceError::UnauthorizedBuyer);
+    }
+    if request.lifecycle != RequestLifecycle::AcceptedByBuyer {
+        return Err(MarketplaceError::RequestNotAccepted);
+    }
+    if request.updated_at + TIME_TO_LOCK > env.block.time.seconds() {
+        return Err(MarketplaceError::RequestNotLocked);
+    }
+
+    if !offer.is_accepted {
+        return Err(MarketplaceError::RequestNotAccepted);
+    }
+
+    request.paid = true;
+    request.lifecycle = RequestLifecycle::Paid;
+
+    let mut new_payment_info = PaymentInfo {
+        buyer: info.sender.clone(),
+        request_id,
+        payer: info.sender.clone(),
+        authority: offer.authority.clone(),
+        amount: Uint128::zero(),
+        coin: coin.clone(),
+        created_at: env.block.time.seconds(),
+        updated_at: env.block.time.seconds(),
+    };
+
+    if coin == CoinPayment::USDT {
+        let usdt_contract = Addr::unchecked(USDT_ADDR); // Replace with actual CW20 address
+
+        // Calculate amount based on a price feed or some other logic
+        let usdt_amount = offer.price; // Assuming price calculation logic is done elsewhere
+        new_payment_info.amount = Uint128::from(usdt_amount);
+
+        // Transfer USDT
+        let transfer_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: usdt_contract.to_string(),
+            msg: to_json_binary(&Cw20ExecuteMsg::TransferFrom {
+                owner: info.sender.to_string(),
+                recipient: env.contract.address.to_string(),
+                amount: usdt_amount.into(),
+            })?,
+            funds: vec![],
+        });
+
+        PAYMENT_INFO.save(deps.storage, request_id, &new_payment_info)?;
+
+        Ok(Response::new().add_message(transfer_msg).add_event(
+            cosmwasm_std::Event::new("request_payment_transacted")
+                .add_attribute("amount", new_payment_info.amount.to_string())
+                .add_attribute("coin", format!("{:?}", coin))
+                .add_attribute("request_id", request_id.to_string())
+                .add_attribute("authority", offer.authority.to_string())
+                .add_attribute("buyer", info.sender.to_string()),
+        ))
+    } else {
+        Err(MarketplaceError::UnknownPaymentType)
+    }
+}
+
+pub fn pay_for_request(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    request_id: u64,
+    coin: CoinPayment,
+) -> Result<Response, MarketplaceError> {
+    let mut request = REQUESTS.load(deps.storage, request_id)?;
+    let offer_id = request.accepted_offer_id;
+    let offer = OFFERS.load(deps.storage, offer_id)?;
+    let user = USERS.load(deps.storage, info.sender.as_bytes())?;
+
+    if request.paid {
+        return Err(MarketplaceError::RequestAlreadyPaid);
+    }
+    if request.buyer_id != user.id {
+        return Err(MarketplaceError::UnauthorizedBuyer);
+    }
+    if request.lifecycle != RequestLifecycle::AcceptedByBuyer {
+        return Err(MarketplaceError::RequestNotAccepted);
+    }
+    if request.updated_at + TIME_TO_LOCK > env.block.time.seconds() {
+        return Err(MarketplaceError::RequestNotLocked);
+    }
+
+    if !offer.is_accepted {
+        return Err(MarketplaceError::RequestNotAccepted);
+    }
+
+    request.paid = true;
+    request.lifecycle = RequestLifecycle::Paid;
+
+    let mut new_payment_info = PaymentInfo {
+        buyer: info.sender.clone(),
+        request_id,
+        payer: info.sender.clone(),
+        authority: offer.authority.clone(),
+        amount: Uint128::zero(),
+        coin: coin.clone(),
+        created_at: env.block.time.seconds(),
+        updated_at: env.block.time.seconds(),
+    };
+
+    if coin == CoinPayment::Cosmos {
+        // Check if the correct amount of native tokens was sent
+        let amount_sent = info
+            .funds
+            .iter()
+            .find(|c| c.denom == COIN_DENOM)
+            .map(|c| c.amount)
+            .unwrap_or_default();
+        if amount_sent < Uint128::from(offer.price) {
+            return Err(MarketplaceError::InsufficientFunds);
+        }
+
+        new_payment_info.amount = Uint128::from(offer.price);
+        PAYMENT_INFO.save(deps.storage, request_id, &new_payment_info)?;
+
+        Ok(Response::new().add_event(
+            cosmwasm_std::Event::new("request_payment_transacted")
+                .add_attribute("amount", new_payment_info.amount.to_string())
+                .add_attribute("coin", format!("{:?}", coin))
+                .add_attribute("request_id", request_id.to_string())
+                .add_attribute("authority", offer.authority.to_string())
+                .add_attribute("buyer", info.sender.to_string()),
+        ))
+    } else {
+        Err(MarketplaceError::UnknownPaymentType)
+    }
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetUser { address } => to_binary(&query_user(deps, address)?),
-        QueryMsg::GetRequest { request_id } => to_binary(&query_request(deps, request_id)?),
-        QueryMsg::GetAllRequests {} => to_binary(&query_all_requests(deps)?),
-        QueryMsg::GetOffer { offer_id } => to_binary(&query_offer(deps, offer_id)?),
+        QueryMsg::GetUser { address } => to_json_binary(&query_user(deps, address)?),
+        QueryMsg::GetRequest { request_id } => to_json_binary(&query_request(deps, request_id)?),
+        QueryMsg::GetAllRequests {} => to_json_binary(&query_all_requests(deps)?),
+        QueryMsg::GetOffer { offer_id } => to_json_binary(&query_offer(deps, offer_id)?),
         QueryMsg::GetOffersByRequest { request_id } => {
-            to_binary(&query_offers_by_request(deps, request_id)?)
+            to_json_binary(&query_offers_by_request(deps, request_id)?)
         }
 
         QueryMsg::GetLocationPreference { address } => {
             let user = USERS.load(deps.storage, deps.api.addr_validate(&address)?.as_bytes())?;
-            to_binary(&user.location_enabled)
+            to_json_binary(&user.location_enabled)
         }
 
-        QueryMsg::GetUserStores { address } => to_binary(&get_user_stores(deps, address)?),
+        QueryMsg::GetUserStores { address } => to_json_binary(&get_user_stores(deps, address)?),
 
-        QueryMsg::GetUserRequests { address } => to_binary(&get_user_requests(deps, address)?),
+        QueryMsg::GetUserRequests { address } => to_json_binary(&get_user_requests(deps, address)?),
 
-        QueryMsg::GetSellerOffers { address } => to_binary(&get_seller_offers(deps, address)?),
+        QueryMsg::GetSellerOffers { address } => to_json_binary(&get_seller_offers(deps, address)?),
 
-        QueryMsg::GetUserById { user_id } => to_binary(&get_user_by_id(deps, user_id)?),
+        QueryMsg::GetUserById { user_id } => to_json_binary(&get_user_by_id(deps, user_id)?),
     }
 }
 
@@ -568,7 +723,7 @@ pub fn get_user_requests(deps: Deps, address: String) -> StdResult<Vec<Request>>
 //         assert_eq!(0, res.messages.len());
 
 //         // it worked, let's query the state
-//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount ).unwrap();
 //         let value: CountResponse = from_binary(&res).unwrap();
 //         assert_eq!(17, value.count);
 //     }
@@ -587,7 +742,7 @@ pub fn get_user_requests(deps: Deps, address: String) -> StdResult<Vec<Request>>
 //         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
 //         // should increase counter by 1
-//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount ).unwrap();
 //         let value: CountResponse = from_binary(&res).unwrap();
 //         assert_eq!(18, value.count);
 //     }
@@ -605,7 +760,7 @@ pub fn get_user_requests(deps: Deps, address: String) -> StdResult<Vec<Request>>
 //         let msg = ExecuteMsg::Reset { count: 5 };
 //         let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
 //         match res {
-//             Err(ContractError::Unauthorized {}) => {}
+//             Err(MarketplaceError::Unauthorized ) => {}
 //             _ => panic!("Must return unauthorized error"),
 //         }
 
@@ -615,7 +770,7 @@ pub fn get_user_requests(deps: Deps, address: String) -> StdResult<Vec<Request>>
 //         let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
 
 //         // should now be 5
-//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount ).unwrap();
 //         let value: CountResponse = from_binary(&res).unwrap();
 //         assert_eq!(5, value.count);
 //     }

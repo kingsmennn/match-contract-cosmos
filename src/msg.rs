@@ -38,7 +38,7 @@ pub enum ExecuteMsg {
         longitude: i128,
     },
     CreateOffer {
-        price: i128,
+        price: u128,
         images: Vec<String>,
         request_id: u64,
         store_name: String,

@@ -1,3 +1,5 @@
+use core::error;
+
 use cosmwasm_std::StdError;
 use thiserror::Error;
 
@@ -27,4 +29,12 @@ pub enum MarketplaceError {
     RequestNotAccepted,
     #[error("Request not locked.")]
     RequestNotLocked,
+    #[error("Offer not found.")]
+    OfferNotFound,
+    #[error("Request already paid.")]
+    RequestAlreadyPaid,
+    #[error("Unknown payment type")]
+    UnknownPaymentType,
+    #[error("Insufficient funds")]
+    InsufficientFunds,
 }
