@@ -496,15 +496,13 @@ pub fn pay_for_request_token(
     };
 
     if coin == CoinPayment::USDT {
-        let usdt_contract = Addr::unchecked(USDT_ADDR); // Replace with actual CW20 address
-
-        // Calculate amount based on a price feed or some other logic
+        //TODO: Calculate amount based on a price feed or some other logic
         let usdt_amount = offer.price; // Assuming price calculation logic is done elsewhere
         new_payment_info.amount = Uint128::from(usdt_amount);
 
         // Transfer USDT
         let transfer_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: usdt_contract.to_string(),
+            contract_addr: USDT_ADDR.to_string(),
             msg: to_json_binary(&Cw20ExecuteMsg::TransferFrom {
                 owner: info.sender.to_string(),
                 recipient: env.contract.address.to_string(),
